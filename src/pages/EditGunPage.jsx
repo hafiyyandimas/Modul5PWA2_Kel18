@@ -196,11 +196,14 @@ export default function EditGunPage({ gun, gunId, onBack, onSuccess }) {
         setTimeout(() => setSuccessMsg(''), 3000)
       }
     } catch (err) {
-      console.warn('Image upload failed, using local blob:', err)
-      setCurrentImageUrl(imagePreview)
-      setImageFile(null)
-      setImagePreview(null)
-    } finally {
+  console.warn('Image upload failed:', err)
+
+  // Pertahankan gambar lama jika upload gambar baru gagal.
+  setImageFile(null)
+  setImagePreview(null)
+
+  setError('Image upload failed. The existing image will be kept.')
+} finally {
       setUploading(false)
     }
   }
