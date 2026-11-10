@@ -63,50 +63,75 @@ class GunService {
   /**
    * Fetch a paginated, filterable list of products.
    */
-  async getGuns(params = {}) {
-    if (IS_SUPABASE) {
-      const queryParts = ['select=*']
+  
+async getGuns(params = {}) {
+  const page = Math.max(1, Number(params.page) || 1)
+  const limit = Math.max(1, Number(params.limit) || 8)
 
-      if (params.search) {
-        queryParts.push(`name=ilike.*${encodeURIComponent(params.search)}*`)
-      }
+  if (IS_SUPABASE) {
+    const offset = (page - 1) * limit
 
-      if (params.category && params.category !== 'All') {
-        queryParts.push(`type=eq.${encodeURIComponent(params.category)}`)
-      }
+    const queryParts = [
+      'select=*',
+      `limit=${limit}`,
+      `offset=${offset}`,
+    ]
 
-      if (params.sort_by) {
-        const order = params.order === 'desc' ? 'desc' : 'asc'
-        queryParts.push(`order=${encodeURIComponent(params.sort_by)}.${order}`)
-      } else {
-        queryParts.push('order=created_at.desc')
-      }
-
-      if (params.limit) {
-        queryParts.push(`limit=${params.limit}`)
-      }
-
-      const queryString = queryParts.join('&')
-      const data = await apiClient.get(`/rest/v1/products?${queryString}`)
-      const list = Array.isArray(data) ? data.map(normalizeProduct) : []
-
-      return {
-        success: true,
-        data: list,
-        pagination: {
-          total: list.length,
-          page: params.page || 1,
-          limit: params.limit || 50,
-        },
-      }
+    if (params.search) {
+      queryParts.push(
+        `name=ilike.*${encodeURIComponent(params.search)}*`
+      )
     }
 
-    // Fallback: university REST API
-    const clean = Object.fromEntries(
-      Object.entries(params).filter(([, v]) => v !== '' && v != null),
+    if (params.category && params.category !== 'All') {
+      queryParts.push(
+        `type=eq.${encodeURIComponent(params.category)}`
+      )
+    }
+
+    if (params.sort_by) {
+      const order = params.order === 'desc' ? 'desc' : 'asc'
+      queryParts.push(`order=${params.sort_by}.${order}`)
+    } else {
+      queryParts.push('order=created_at.desc')
+    }
+
+    const queryString = queryParts.join('&')
+
+    const data = await apiClient.get(
+      `/rest/v1/products?${queryString}`
     )
-    return apiClient.get('/api/v1/recipes', { params: clean })
+
+    const list = Array.isArray(data)
+      ? data.map(normalizeProduct)
+      : []
+
+    return {
+      success: true,
+      data: list,
+      pagination: {
+        page,
+        limit,
+        total: list.length,
+        totalPages: list.length < limit ? page : page + 1,
+      },
+    }
   }
+
+  // REST API pribadi
+  const clean = Object.fromEntries(
+    Object.entries({
+      ...params,
+      page,
+      limit,
+    }).filter(([, value]) => value !== '' && value != null)
+  )
+
+  return apiClient.get('/api/v1/recipes', {
+    params: clean,
+  })
+}
+
 
   /**
    * Fetch a single product by ID.

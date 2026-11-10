@@ -1,5 +1,6 @@
 import FavoriteButton from '../common/FavoriteButton'
 import { formatPrice, truncate } from '../../utils/helpers'
+import { Share2 } from 'lucide-react'
 
 /**
  * Product card used in the catalog grid.
@@ -15,6 +16,42 @@ export default function GunCard({ gun, onSelect, onEdit, onDelete }) {
   const category = gun.type || gun.category || '—'
   const caliber = gun.caliber || gun.difficulty || ''
   const price = gun.price ?? gun.cook_time ?? 0
+  const handleShare = async (e) => {
+  e.stopPropagation()
+
+  if (!gun.id) {
+    alert('Produk belum memiliki ID.')
+    return
+  }
+
+  const shareUrl = new URL(window.location.href)
+  shareUrl.search = ''
+  shareUrl.searchParams.set('product', gun.id)
+
+  const shareData = {
+    title: gun.name,
+    text: `Lihat katalog ${gun.name}`,
+    url: shareUrl.toString(),
+  }
+
+  try {
+    if (navigator.share) {
+      await navigator.share(shareData)
+    } else {
+      await navigator.clipboard.writeText(shareData.url)
+      alert('Link berhasil disalin!')
+    }
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      try {
+        await navigator.clipboard.writeText(shareData.url)
+        alert('Link berhasil disalin!')
+      } catch {
+        alert('Gagal membagikan link.')
+      }
+    }
+  }
+}
 
   return (
     <li className="card">
@@ -25,13 +62,18 @@ export default function GunCard({ gun, onSelect, onEdit, onDelete }) {
         aria-label={`View ${gun.name}`}
       >
         <img
-          className="card-img"
-          src={imgSrc}
-          alt={gun.name}
-          width="240"
-          height="180"
-          loading="lazy"
-        />
+      className="card-img"
+      src={imgSrc}
+      alt={gun.name}
+      width="240"
+      height="180"
+      loading="lazy"
+      decoding="async"
+      onError={(e) => {
+    e.currentTarget.onerror = null
+    e.currentTarget.src = '/guns/pistol.svg'
+  }}
+/>
 
         <span className="name display">{gun.name}</span>
 
@@ -49,7 +91,17 @@ export default function GunCard({ gun, onSelect, onEdit, onDelete }) {
 
       {/* Floating actions row */}
       <div className="card-actions">
-        <FavoriteButton gunId={gun.id || gun.name} />
+  <FavoriteButton gunId={gun.id || gun.name} />
+
+  <button
+    type="button"
+    className="card-act-btn"
+    onClick={handleShare}
+    title="Share Product"
+    aria-label={`Share ${gun.name}`}
+  >
+    <Share2 size={16} />
+  </button>
 
         {onEdit && (
           <button

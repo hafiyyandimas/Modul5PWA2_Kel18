@@ -1,90 +1,89 @@
+
 import { useState, useEffect, useCallback } from 'react'
 import gunService from '../services/gunService'
 
-// ---------------------------------------------------------------------------
-// useGuns — fetch the paginated / filtered product list from the API.
-//
-// Returns { guns, loading, error, pagination, refetch }.
-// When the API is unreachable the `error` string will be set and `guns`
-// will remain an empty array so the UI can show a proper error state.
-// ---------------------------------------------------------------------------
+// Cache data katalog selama 60 detik
+const queryCache = new Map()
+const CACHE_DURATION = 60 * 1000
 
 export function useGuns(params = {}) {
+  const paramKey = JSON.stringify(params)
+
   const [guns, setGuns] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [pagination, setPagination] = useState(null)
+  const [cacheHit, setCacheHit] = useState(false)
 
-  // Serialise params so the effect re-runs when they change.
-  const paramKey = JSON.stringify(params)
-
-  const fetchGuns = useCallback(async () => {
+  const fetchGuns = useCallback(async (force = false) => {
     try {
-      setLoading(true)
       setError(null)
 
-      const response = await gunService.getGuns(params)
+      const cached = queryCache.get(paramKey)
+
+      // Gunakan cache jika masih berlaku
+      if (
+        !force &&
+        cached &&
+        Date.now() - cached.timestamp < CACHE_DURATION
+      ) {
+        setGuns(cached.data)
+        setPagination(cached.pagination)
+        setCacheHit(true)
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      setCacheHit(false)
+
+      const response = await gunService.getGuns(
+        JSON.parse(paramKey)
+      )
 
       if (response.success) {
-        setGuns(response.data || [])
-        setPagination(response.pagination || null)
+        const data = response.data || []
+        const pageInfo = response.pagination || null
+
+        setGuns(data)
+        setPagination(pageInfo)
+
+        // Simpan hasil request ke cache
+        queryCache.set(paramKey, {
+          data,
+          pagination: pageInfo,
+          timestamp: Date.now(),
+        })
       } else {
         setError(response.message || 'Failed to fetch products.')
       }
     } catch (err) {
-      setError(err.message || 'An error occurred while fetching products.')
+      setError(err.message || 'An error occurred.')
       setGuns([])
     } finally {
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramKey])
 
   useEffect(() => {
     fetchGuns()
   }, [fetchGuns])
 
-  return { guns, loading, error, pagination, refetch: fetchGuns }
+  const refetch = useCallback(() => {
+    return fetchGuns(true)
+  }, [fetchGuns])
+
+  return {
+    guns,
+    loading,
+    error,
+    pagination,
+    refetch,
+    cacheHit,
+  }
 }
 
-// ---------------------------------------------------------------------------
-// useGunById — fetch a single product by its UUID.
-//
-// Returns { gun, loading, error, refetch }.
-// ---------------------------------------------------------------------------
-
-export function useGunById(id) {
-  const [gun, setGun] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  const fetchGun = useCallback(async () => {
-    if (!id) {
-      setLoading(false)
-      return
-    }
-    try {
-      setLoading(true)
-      setError(null)
-
-      const response = await gunService.getGunById(id)
-
-      if (response.success) {
-        setGun(response.data)
-      } else {
-        setError(response.message || 'Product not found.')
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to load product details.')
-      setGun(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [id])
-
-  useEffect(() => {
-    fetchGun()
-  }, [fetchGun])
-
-  return { gun, loading, error, refetch: fetchGun }
+// Panggil setelah data katalog mengalami perubahan
+export function clearGunsCache() {
+  queryCache.clear()
 }

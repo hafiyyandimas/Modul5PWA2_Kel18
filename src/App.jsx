@@ -14,6 +14,7 @@ import ConfirmModal from './components/modals/ConfirmModal.jsx'
 import SplashScreen from './components/common/SplashScreen.jsx'
 import gunService from './services/gunService.js'
 import './App.css'
+import { useState, useEffect } from 'react'
 
 function App() {
   const [showSplash, setShowSplash] = useState(true)
@@ -24,6 +25,29 @@ function App() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
+  useEffect(() => {
+  const loadSharedProduct = async () => {
+    const params = new URLSearchParams(window.location.search)
+    const productId = params.get('product')
+
+    if (!productId) return
+
+    try {
+      const response = await gunService.getGunById(productId)
+
+      if (response.success && response.data) {
+        setSelectedGun(response.data)
+        setMode('detail')
+        setTab('Catalog')
+        setShowSplash(false)
+      }
+    } catch (error) {
+      console.error('Failed to load shared product:', error)
+    }
+  }
+
+  loadSharedProduct()
+}, [])
   // Unified navigation handler
   const handleNavigate = (target, payload) => {
     if (target === 'Create') {
@@ -48,10 +72,15 @@ function App() {
   }
 
   const handleBackToList = () => {
-    setMode('list')
-    setSelectedGun(null)
-    setEditingGun(null)
-  }
+  setMode('list')
+  setSelectedGun(null)
+  setEditingGun(null)
+
+  const url = new URL(window.location.href)
+  url.searchParams.delete('product')
+
+  window.history.replaceState({}, '', url)
+}
 
   return (
     <div className="shell">
