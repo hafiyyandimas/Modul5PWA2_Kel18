@@ -1,6 +1,7 @@
 import FavoriteButton from '../common/FavoriteButton'
 import { formatPrice, truncate } from '../../utils/helpers'
 import { Share2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * Product card used in the catalog grid.
@@ -18,6 +19,31 @@ export default function GunCard({ gun, onSelect, onEdit, onDelete }) {
   const price = gun.price ?? gun.cook_time ?? 0
   const handleShare = async (e) => {
   e.stopPropagation()
+
+const imageRef = useRef(null)
+const [shouldLoad, setShouldLoad] = useState(false)
+
+useEffect(() => {
+  const image = imageRef.current
+  if (!image) return
+
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        setShouldLoad(true)
+        observer.disconnect()
+      }
+    },
+    {
+      rootMargin: '0px',
+      threshold: 0,
+    }
+  )
+
+  observer.observe(image)
+
+  return () => observer.disconnect()
+}, [])
 
   if (!gun.id) {
     alert('Produk belum memiliki ID.')
@@ -62,14 +88,15 @@ export default function GunCard({ gun, onSelect, onEdit, onDelete }) {
         aria-label={`View ${gun.name}`}
       >
         <img
-      className="card-img"
-      src={imgSrc}
-      alt={gun.name}
-      width="240"
-      height="180"
-      loading="lazy"
-      decoding="async"
-      onError={(e) => {
+  ref={imageRef}
+  className="card-img"
+  src={shouldLoad ? imgSrc : undefined}
+  alt={gun.name}
+  width="240"
+  height="180"
+  loading="lazy"
+  decoding="async"
+  onError={(e) => {
     e.currentTarget.onerror = null
     e.currentTarget.src = '/guns/pistol.svg'
   }}
